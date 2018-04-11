@@ -6,7 +6,8 @@ namespace BuyTool_CLR
 {
     public class Receipt
     {
-        public char ReceiptType { get; set;  } 
+        public char ReceiptType { get; set;  }
+        public char FlowType { get; set; }
         public int Week { get; set; }
         public int Qty { get; set; }
         public int CriticalWeek { get; set; }

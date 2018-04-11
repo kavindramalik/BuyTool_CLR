@@ -435,6 +435,10 @@ namespace BuyTool_CLR
             col.AllowDBNull = false;
             dt.Columns.Add(col);
 
+            col = new DataColumn("Flow_Type", typeof(char));
+            col.AllowDBNull = true;
+            dt.Columns.Add(col);
+
             col = new DataColumn("Week", typeof(int));
             col.AllowDBNull = false;
             dt.Columns.Add(col);
@@ -458,10 +462,11 @@ namespace BuyTool_CLR
                 DataRow row = dt.NewRow();
 
                 row[0] = receipt.ReceiptType;
-                row[1] = receipt.Week;
-                row[2] = receipt.Qty;
-                row[3] = receipt.CriticalWeek;
-                row[4] = Math.Round(receipt.CriticalFraction, 5);
+                row[1] = receipt.FlowType;
+                row[2] = receipt.Week;
+                row[3] = receipt.Qty;
+                row[4] = receipt.CriticalWeek;
+                row[5] = Math.Round(receipt.CriticalFraction, 5);
                 if (debug)
                     sqlP.Send(receipt.ReceiptType + "," + receipt.Week + "," + receipt.Qty + "," + receipt.CriticalWeek + "," + receipt.CriticalFraction);
 

@@ -232,13 +232,14 @@ public partial class StoredProcedures
     #endregion
 
     #region initializeReceipts
-    private static void initializeReceipts(SqlInt32 style_color_id, SalesAndReceiptPlan salesAndReceiptPlan)
+    private static void initializeReceipts(SqlInt32 style_color_id, SalesAndReceiptPlan salesAndReceiptPlan, bool debug = false)
     {
-        bool debug = false;
+        
         int earliestReceiptWeek = -1;
         Dictionary<int, int> receiptPlan = new Dictionary<int, int>();
         Dictionary<int, int> purchaseOrders = new Dictionary<int, int>();
         Dictionary<int, int> overridesPlan = new Dictionary<int, int>();
+        
         using (SqlConnection connection = new SqlConnection("context connection=true"))
         {
             using (SqlCommand cmd = new SqlCommand("dbo.Get_Receipts", connection))
@@ -286,6 +287,7 @@ public partial class StoredProcedures
             }
         }
         SqlPipe sqlP = SqlContext.Pipe;
+        if (debug) sqlP.Send("Step 0");
 
         salesAndReceiptPlan.FirstReceiptWeek = earliestReceiptWeek;
 
@@ -294,27 +296,32 @@ public partial class StoredProcedures
         Dictionary<int, Receipt> receiptDict = new Dictionary<int, Receipt>();
         foreach (KeyValuePair<int, int> kvp in purchaseOrders)
         {
-            receiptDict.Add(kvp.Key, new Receipt { Week = kvp.Key, Qty = kvp.Value, ReceiptType = 'P' });
-            totalReceiptU += kvp.Value;
-            validReceiptsCount++;
+            if (kvp.Value > 0)
+            {
+                receiptDict.Add(kvp.Key, new Receipt { Week = kvp.Key, Qty = kvp.Value, ReceiptType = 'P', FlowType = 'F' });
+                totalReceiptU += kvp.Value;
+                validReceiptsCount++;
+            }
         }
+        if (debug) sqlP.Send("Step 1");
         foreach (KeyValuePair<int, int> kvp in overridesPlan)
         {
             if (!receiptDict.ContainsKey(kvp.Key))
             {
-                receiptDict.Add(kvp.Key, new Receipt { Week = kvp.Key, Qty = kvp.Value, ReceiptType = 'O' });
-                totalReceiptU += kvp.Value;
+                receiptDict.Add(kvp.Key, new Receipt { Week = kvp.Key, Qty = kvp.Value, ReceiptType = 'O', FlowType = 'F' });
                 if (kvp.Value > 0)
                 {
+                    totalReceiptU += kvp.Value;
                     validReceiptsCount++;
                 }
             }
         }
+        if (debug) sqlP.Send("Step 2");
         foreach (KeyValuePair<int, int> kvp in receiptPlan)
         {
-            if (!receiptDict.ContainsKey(kvp.Key))
+            if (!receiptDict.ContainsKey(kvp.Key) && kvp.Value > 0)
             {
-                receiptDict.Add(kvp.Key, new Receipt { Week = kvp.Key, Qty = kvp.Value, ReceiptType = 'T' });
+                receiptDict.Add(kvp.Key, new Receipt { Week = kvp.Key, Qty = kvp.Value, ReceiptType = 'T', FlowType = 'F' });
                 totalReceiptU += kvp.Value;
                 validReceiptsCount++;
             }
@@ -323,9 +330,11 @@ public partial class StoredProcedures
         sqlP.Send("totalReceiptU " + totalReceiptU);
         salesAndReceiptPlan.TotalReceiptU = totalReceiptU;
         Receipt[] receipts = null;
+        
 
         if (validReceiptsCount > 0)
         {
+            if (debug) sqlP.Send("Step 3 - receipt Count = " + validReceiptsCount + ", receiptDict.count = " + receiptDict.Count);
 
             receipts = new Receipt[validReceiptsCount];
             int i = 0;
@@ -335,10 +344,10 @@ public partial class StoredProcedures
                 {
                     receipts[i++] = r;
                 }
-                if (debug)
-                    sqlP.Send(i.ToString());
             }
             Array.Sort<Receipt>(receipts, (x, y) => x.Week.CompareTo(y.Week));
+
+            if (debug) sqlP.Send("Step 4");
 
             if (debug)
             {
@@ -394,6 +403,10 @@ public partial class StoredProcedures
 
 //                salesAndReceiptPlan.PlanStartWeek = (int)cmd.Parameters["@plan_start_week"].Value;
                 salesAndReceiptPlan.BOH = (int)cmd.Parameters["@beginning_on_hand"].Value;
+                if (salesAndReceiptPlan.BOH == 0 && salesAndReceiptPlan.Receipts != null)
+                {
+                    salesAndReceiptPlan.Receipts[0].FlowType = 'I';
+                }
             }
         }
 
@@ -466,7 +479,8 @@ public partial class StoredProcedures
                 }
             }
         }
-        sqlP.Send(style_color_id.ToString() + " processed.");
+        if (debug)
+            sqlP.Send(style_color_id.ToString() + " processed.");
     }
     #endregion
 
